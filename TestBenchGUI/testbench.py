@@ -337,6 +337,22 @@ class ThrusterGUI(QMainWindow):
         self.output_frequency = int(freq)
         if self.serial_timer.isActive():
             self.serial_timer.start(1000 // self.output_frequency)
+            
+    def crc8(data: bytearray) -> int:
+        # Polinomio CRC-8: 0x07 (x^8 + x^7 + x^6 + x^5 + x^4 + x^3 + x^2 + 1)
+        polynomial = 0x07
+        crc = 0x00  # Inizializza il CRC a zero
+        
+        for byte in data:
+            crc ^= byte  # XOR del byte con il CRC
+            for _ in range(8):  # 8 bit per ogni byte
+                if crc & 0x80:  # Se il bit più significativo è 1
+                    crc = (crc << 1) ^ polynomial  # Shift a sinistra e XOR con il polinomio
+                else:
+                    crc <<= 1  # Solo shift a sinistra
+                crc &= 0xFF  # Mantieni solo gli 8 bit meno significativi (per evitare overflow)
+        
+        return crc
 
     def serial_send(self, pwm_values):
         """
@@ -354,7 +370,10 @@ class ThrusterGUI(QMainWindow):
 
         # Open serial port and send data
         if(self.serial_status == 1):
+            self.serial_conn.write('0xAA')
             self.serial_conn.write(packet)
+            self.serial_conn.write(crc8(bytearray([0xAA, packet])))
+            self.serial_conn.write('0xEE')
             print(f"Sent: {pwm_values}")
         else:
             raise ConnectionError("Serial connection is not open. Check your port settings.")
