@@ -50,7 +50,7 @@ class ThrusterGUI(QMainWindow):
         self.serial_port = None
         self.output_frequency = DEFAULT_FREQUENCY
 
-        self.cached_pwms = []
+        self.cached_pwms = [([], [])] * 8
         self.serial_timer = QTimer(self)
         self.serial_timer.timeout.connect(self.send_pwms)
         self.serial_conn = None
@@ -338,7 +338,7 @@ class ThrusterGUI(QMainWindow):
         if self.serial_timer.isActive():
             self.serial_timer.start(1000 // self.output_frequency)
             
-    def crc8(data: bytearray) -> int:
+    def crc8(self, data: bytearray) -> int:
         # Polinomio CRC-8: 0x07 (x^8 + x^7 + x^6 + x^5 + x^4 + x^3 + x^2 + 1)
         polynomial = 0x07
         crc = 0x00  # Inizializza il CRC a zero
@@ -366,14 +366,17 @@ class ThrusterGUI(QMainWindow):
         pwm_values = [max(1100, min(1900, pwm)) for pwm in pwm_values]
 
         # Pack the data into 16 bytes (8 x uint16_t) in little-endian format
+        print(pwm_values)
+        print(*pwm_values)
         packet = struct.pack('<8H', *pwm_values)
 
         # Open serial port and send data
         if(self.serial_status == 1):
-            self.serial_conn.write('0xAA')
+            self.serial_conn.write(bytes.fromhex('AA'))
             self.serial_conn.write(packet)
-            self.serial_conn.write(crc8(bytearray([0xAA, packet])))
-            self.serial_conn.write('0xEE')
+            crc = self.crc8(bytearray(bytes.fromhex('AA')) + bytearray(packet))
+            self.serial_conn.write(struct.pack('<B', crc))
+            self.serial_conn.write(bytes.fromhex('EE'))
             print(f"Sent: {pwm_values}")
         else:
             raise ConnectionError("Serial connection is not open. Check your port settings.")
@@ -396,6 +399,15 @@ class ThrusterGUI(QMainWindow):
         self.setup_serial()
         if(not self.serial_status): raise ConnectionError("Serial connection is not open. Check your port settings.")
         self.compute_pwms()
+        if(self.serial_status == 1):
+            self.serial_conn.write(bytes.fromhex('FF'))
+            self.serial_conn.write(bytes.fromhex('00'))
+            self.serial_conn.write(bytes.fromhex('01'))
+            self.serial_conn.write(bytes.fromhex('00'))
+            self.serial_conn.write(bytes.fromhex('00'))
+            self.serial_conn.write(bytes.fromhex('52'))
+            self.serial_conn.write(bytes.fromhex('EE'))
+        else : ConnectionError("Serial connection is not open. Check your port settings.")
         self.com_step = 0 # at each step, we increment this, so I know what values I have to output
         self.serial_timer.start(1000 // self.output_frequency)
 
@@ -410,11 +422,15 @@ class ThrusterGUI(QMainWindow):
     def compute_pwms(self):
         self.compute_max_time()
         for i in range(THRUSTER_COUNT):
+            print(i)
             points = self.points[i]
+            print(f"0-{i}")
 
             times, pwm_values = zip(*points)
+            print(f"1-{i}")
             times = np.array(times)
             pwm_values = np.array(pwm_values)
+            print(f"2-{i}")
 
             if self.selected_interpolation == "linear":
                 f = interp1d(times, pwm_values, kind="linear", fill_value="extrapolate")
@@ -423,11 +439,15 @@ class ThrusterGUI(QMainWindow):
             elif self.selected_interpolation == "polynomial":
                 f = BarycentricInterpolator(times, pwm_values)
 
+
+            print(f"3-{i}")
             t_interp = np.linspace(0, round(self.max_time), int(self.max_time * self.output_frequency) + 1) # each step should be the same as the period
             y_interp = f(t_interp)
-
+            print(f"4-{i}")
             y_interp = np.clip(y_interp, 1100, 1900)
+            print(f"5-{i}")
             self.cached_pwms[i] = (t_interp, y_interp)
+            print(f"6-{i}")
         # for i in range(THRUSTER_COUNT) : print(f"({time}, {pwm})" for time, pwm in self.cached_pwms[i])
 
     def send_pwms(self):
@@ -440,7 +460,7 @@ class ThrusterGUI(QMainWindow):
         """Lookup on cached pwm values"""
         result = []
         for i in range(THRUSTER_COUNT):
-            result.append(self.cached_pwms[i][1][step])
+            result.append(int(self.cached_pwms[i][1][step]))
         return result
 
     def json_save_sequence(self):
@@ -479,15 +499,13 @@ class ThrusterGUI(QMainWindow):
                 self.selected_interpolation = data.get("interpolation_method", "linear")
                 self.output_frequency = data.get("frequency", 20)
 
-                # Restore thruster data
                 for i in range(THRUSTER_COUNT):
                     self.points[i] = data["thruster_data"].get(str(i), [])
                     self.update_graph(i)
                     self.interpolate_thruster_curve(i)
 
-                self.compute_pwms()
+                #self.compute_pwms()
                 print(f"Sequence loaded from {file_path}")
-
 
             except Exception as e:
                 print(f"Error loading JSON: {e}")

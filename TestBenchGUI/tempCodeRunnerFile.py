@@ -1,0 +1,1 @@
+data["thruster_data"].get(str(i), [])
