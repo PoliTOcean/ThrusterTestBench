@@ -65,6 +65,7 @@ class ThrusterGUI(QMainWindow):
         central_widget = QWidget()
         main_layout = QVBoxLayout()
         control_layout = QHBoxLayout()
+        menu_layout = QHBoxLayout()
 
         menubar = QMenuBar(self)
 
@@ -119,6 +120,9 @@ class ThrusterGUI(QMainWindow):
         button_layout.addWidget(self.edit_button)
         button_layout.addWidget(self.remove_button)
 
+        menu_layout.addWidget(menubar)
+        main_layout.addLayout(menu_layout)
+        
         main_layout.addLayout(button_layout)
 
         # Save / Load
