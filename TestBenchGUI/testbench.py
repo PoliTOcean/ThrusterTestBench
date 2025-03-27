@@ -372,12 +372,13 @@ class ThrusterGUI(QMainWindow):
 
         # Open serial port and send data
         if(self.serial_status == 1):
-            self.serial_conn.write(bytes.fromhex('AA'))
-            self.serial_conn.write(packet)
-            crc = self.crc8(bytearray(bytes.fromhex('AA')) + bytearray(packet))
-            self.serial_conn.write(struct.pack('<B', crc))
-            self.serial_conn.write(bytes.fromhex('EE'))
+            fullpacket = bytearray(bytes.fromhex('AA0000')) \
+                + bytearray(packet) \
+                + bytearray(struct.pack('<B', self.crc8(bytearray(bytes.fromhex('AA0000')) + bytearray(packet)))) \
+                + bytearray(bytes.fromhex('EE'))
+            self.serial_conn.write(fullpacket)
             print(f"Sent: {pwm_values}")
+            print(f"The full bytes packet was: {fullpacket}")
         else:
             raise ConnectionError("Serial connection is not open. Check your port settings.")
 
@@ -458,9 +459,11 @@ class ThrusterGUI(QMainWindow):
 
     def get_pwms(self, step: int) -> list[int]:
         """Lookup on cached pwm values"""
-        result = []
-        for i in range(THRUSTER_COUNT):
-            result.append(int(self.cached_pwms[i][1][step]))
+        try :
+            result = []
+            for i in range(THRUSTER_COUNT):
+                result.append(int(self.cached_pwms[i][1][step]))
+        except : ...
         return result
 
     def json_save_sequence(self):
