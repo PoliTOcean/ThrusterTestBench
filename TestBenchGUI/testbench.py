@@ -13,6 +13,7 @@ from PyQt5.QtGui import QKeySequence, QIcon
 from scipy.interpolate import interp1d, BarycentricInterpolator
 import serial
 import serial.tools.list_ports
+import time
 
 PWM_MIN, PWM_MAX = 1100, 1900
 THRUSTER_COUNT = 8
@@ -392,8 +393,10 @@ class ThrusterGUI(QMainWindow):
 
     def serial_start_stop(self):
         if self.serial_status == 1:
+            print("Stopping.")
             self.serial_send_idle()
         else:
+            print("Starting")
             self.serial_start()
         
     def serial_start(self):
@@ -423,32 +426,20 @@ class ThrusterGUI(QMainWindow):
     def compute_pwms(self):
         self.compute_max_time()
         for i in range(THRUSTER_COUNT):
-            print(i)
             points = self.points[i]
-            print(f"0-{i}")
-
             times, pwm_values = zip(*points)
-            print(f"1-{i}")
             times = np.array(times)
             pwm_values = np.array(pwm_values)
-            print(f"2-{i}")
-
             if self.selected_interpolation == "linear":
                 f = interp1d(times, pwm_values, kind="linear", fill_value="extrapolate")
             elif self.selected_interpolation == "constant":
                 f = interp1d(times, pwm_values, kind="previous", fill_value="extrapolate")
             elif self.selected_interpolation == "polynomial":
                 f = BarycentricInterpolator(times, pwm_values)
-
-
-            print(f"3-{i}")
             t_interp = np.linspace(0, round(self.max_time), int(self.max_time * self.output_frequency) + 1) # each step should be the same as the period
             y_interp = f(t_interp)
-            print(f"4-{i}")
             y_interp = np.clip(y_interp, 1100, 1900)
-            print(f"5-{i}")
             self.cached_pwms[i] = (t_interp, y_interp)
-            print(f"6-{i}")
         # for i in range(THRUSTER_COUNT) : print(f"({time}, {pwm})" for time, pwm in self.cached_pwms[i])
 
     def send_pwms(self):
