@@ -232,7 +232,7 @@ class ThrusterGUI(QMainWindow):
         if not ok:
             return
         
-        self.points[thruster_num - 1].append((time_value, pwm_value))
+        self.points[thruster_num - 1].append([time_value, pwm_value])
         self.points[thruster_num - 1].sort()  # Keep sorted by time
         self.update_graph(thruster_num - 1)
 
@@ -259,7 +259,7 @@ class ThrusterGUI(QMainWindow):
         if not ok:
             return
         
-        self.points[thruster_index][selected_index] = (new_time, new_pwm)
+        self.points[thruster_index][selected_index] = [new_time, new_pwm]
         self.points[thruster_index].sort()
         self.update_graph(thruster_index)
     
