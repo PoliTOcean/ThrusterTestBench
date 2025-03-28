@@ -224,7 +224,7 @@ class ThrusterGUI(QMainWindow):
         if not ok:
             return
         
-        time_value, ok = QInputDialog.getDouble(self, "Add Point", "Enter time (s):", min=0)
+        time_value, ok = QInputDialog.getDouble(self, "Add Point", "Enter time (s):", min=0, decimals=4)
         if not ok:
             return
         
@@ -251,7 +251,7 @@ class ThrusterGUI(QMainWindow):
         if not ok : return
         
         selected_index = point_list.index(selected_point)
-        new_time, ok = QInputDialog.getDouble(self, "Edit Point", "Enter new time (s):", min=0)
+        new_time, ok = QInputDialog.getDouble(self, "Edit Point", "Enter new time (s):", min=0, decimals=4)
         if not ok:
             return
         
