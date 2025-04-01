@@ -13,7 +13,7 @@ from PyQt5.QtGui import QKeySequence, QIcon
 from scipy.interpolate import interp1d, BarycentricInterpolator
 import serial
 import serial.tools.list_ports
-import time
+import copy
 
 PWM_MIN, PWM_MAX = 1100, 1900
 THRUSTER_COUNT = 8
@@ -23,7 +23,7 @@ DEFAULT_BAUD = 115200
 def main():
     app = QApplication(sys.argv)
     window = ThrusterGUI()
-    app.setWindowIcon(QIcon("./icon_bgless.png"))
+    app.setWindowIcon(QIcon("./TestBenchGUI/icon_bgless.png"))
 
     # set stylesheet
     # file = QFile(":/dark/stylesheet.qss")
@@ -71,6 +71,7 @@ class ThrusterGUI(QMainWindow):
 
         self.file_menu = menubar.addMenu("File")
         self.serial_menu = menubar.addMenu("Serial")
+        self.edit_menu = menubar.addMenu("Edit")
 
         # Scrollable area for graphs
         scroll_area = QScrollArea()
@@ -124,6 +125,12 @@ class ThrusterGUI(QMainWindow):
         main_layout.addLayout(menu_layout)
         
         main_layout.addLayout(button_layout)
+
+        # copy and paste graphs
+
+        copypaste_graphs_action = QAction("Copy / Paste Graphs", self)
+        copypaste_graphs_action.triggered.connect(self.copy_paste_graphs)
+        self.edit_menu.addAction(copypaste_graphs_action)
 
         # Save / Load
 
@@ -218,19 +225,29 @@ class ThrusterGUI(QMainWindow):
             freq_menu.addAction(freq_action)
 
         self.serial_menu.addMenu(freq_menu)
+    
+    def copy_paste_graphs(self):
+        graph_src, ok = QInputDialog.getInt(self, "Source Thruster", "Enter thruster number (1-8):", min=1, max=8)
+        if not ok : return
+        graph_dest, ok = QInputDialog.getInt(self, "Destination Thruster", "Enter thruster number (1-8):", min=1, max=8)
+        if not ok: return
+        if graph_src == graph_dest:
+            QMessageBox.warning(self, "Error", "Source and destination thruster numbers cannot be the same.")
+            return
+        self.points[graph_dest - 1] = copy.deepcopy(self.points[graph_src - 1])
+        self.update_graph(graph_dest - 1)
+        self.interpolate_thruster_curve(graph_dest - 1)
+        
 
     def add_point_dialog(self):
         thruster_num, ok = QInputDialog.getInt(self, "Add Point", "Enter thruster number (1-8):", min=1, max=8)
-        if not ok:
-            return
+        if not ok : return
         
         time_value, ok = QInputDialog.getDouble(self, "Add Point", "Enter time (s):", min=0, decimals=4)
-        if not ok:
-            return
+        if not ok : return
         
         pwm_value, ok = QInputDialog.getInt(self, "Add Point", "Enter PWM value (1100-1900):", min=1100, max=1900)
-        if not ok:
-            return
+        if not ok : return
         
         self.points[thruster_num - 1].append([time_value, pwm_value])
         self.points[thruster_num - 1].sort()  # Keep sorted by time
