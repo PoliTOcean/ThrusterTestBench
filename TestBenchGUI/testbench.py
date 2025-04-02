@@ -14,6 +14,7 @@ from scipy.interpolate import interp1d, BarycentricInterpolator
 import serial
 import serial.tools.list_ports
 import copy
+import thruster_selection
 
 PWM_MIN, PWM_MAX = 1100, 1900
 THRUSTER_COUNT = 8
@@ -24,12 +25,6 @@ def main():
     app = QApplication(sys.argv)
     window = ThrusterGUI()
     app.setWindowIcon(QIcon("./TestBenchGUI/icon_bgless.png"))
-
-    # set stylesheet
-    # file = QFile(":/dark/stylesheet.qss")
-    # file.open(QFile.ReadOnly | QFile.Text)
-    # stream = QTextStream(file)
-    # app.setStyleSheet(stream.readAll())
 
     window.show()
     sys.exit(app.exec())
@@ -132,6 +127,18 @@ class ThrusterGUI(QMainWindow):
         copypaste_graphs_action.triggered.connect(self.copy_paste_graphs)
         self.edit_menu.addAction(copypaste_graphs_action)
 
+        # scaling time
+
+        scale_time_action = QAction("Scale Time axis", self)
+        scale_time_action.triggered.connect(self.scale_graphs_time)
+        self.edit_menu.addAction(scale_time_action)
+
+        # scaling pwm
+
+        scale_pwm_action = QAction("Scale PWM axis", self)
+        scale_pwm_action.triggered.connect(self.scale_graphs_pwm)
+        self.edit_menu.addAction(scale_pwm_action)
+
         # Save / Load
 
         save_action = QAction("Save to file", self)
@@ -229,6 +236,15 @@ class ThrusterGUI(QMainWindow):
     def copy_paste_graphs(self):
         graph_src, ok = QInputDialog.getInt(self, "Source Thruster", "Enter thruster number (1-8):", min=1, max=8)
         if not ok : return
+        graphs_dest_dialog = thruster_selection.CheckboxInputDialog("Select Destination Thrusters", "Select the thruster(s) to copy the graph to:", self)
+        if not graphs_dest_dialog.exec_(): return
+        graphs_dest = graphs_dest_dialog.get_checked()
+        if not graphs_dest : return
+        for i in graphs_dest:
+            self.points[i] = copy.deepcopy(self.points[graph_src - 1])
+            self.update_graph(i)
+            self.interpolate_thruster_curve(i)
+        ''' ez version
         graph_dest, ok = QInputDialog.getInt(self, "Destination Thruster", "Enter thruster number (1-8):", min=1, max=8)
         if not ok: return
         if graph_src == graph_dest:
@@ -236,8 +252,33 @@ class ThrusterGUI(QMainWindow):
             return
         self.points[graph_dest - 1] = copy.deepcopy(self.points[graph_src - 1])
         self.update_graph(graph_dest - 1)
-        self.interpolate_thruster_curve(graph_dest - 1)
+        self.interpolate_thruster_curve(graph_dest - 1)'''
         
+    def scale_graphs_time(self):
+        selected_graphs_dialog = thruster_selection.CheckboxInputDialog("Scale Time axis.", "Select the thruster(s):", self)
+        if not selected_graphs_dialog.exec_(): return
+        selected_graphs = selected_graphs_dialog.get_checked()
+        if not selected_graphs: return
+        scale_factor, ok = QInputDialog.getDouble(self, "Scale Time", "Enter scale factor:", min=0.1, max=10.0, decimals=2)
+        if not ok: return
+        for i in selected_graphs:
+            for point in self.points[i]:
+                point[0] *= scale_factor
+            self.update_graph(i)
+            self.interpolate_thruster_curve(i)
+
+    def scale_graphs_pwm(self):
+        selected_graphs_dialog = thruster_selection.CheckboxInputDialog("Scale PWM axis.", "Select the thruster(s):", self)
+        if not selected_graphs_dialog.exec_(): return
+        selected_graphs = selected_graphs_dialog.get_checked()
+        if not selected_graphs: return
+        scale_factor, ok = QInputDialog.getDouble(self, "Scale PWM", "Enter scale factor:", min=0.1, max=10.0, decimals=2)
+        if not ok: return
+        for i in selected_graphs:
+            for point in self.points[i]:
+                point[1] = 1500 + scale_factor * (point[1] - 1500)
+            self.update_graph(i)
+            self.interpolate_thruster_curve(i)
 
     def add_point_dialog(self):
         thruster_num, ok = QInputDialog.getInt(self, "Add Point", "Enter thruster number (1-8):", min=1, max=8)
